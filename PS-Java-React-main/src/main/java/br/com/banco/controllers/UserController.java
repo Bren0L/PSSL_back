@@ -5,17 +5,17 @@ import br.com.banco.models.TransactionModel;
 import br.com.banco.models.UserModel;
 import br.com.banco.services.TransactionService;
 import br.com.banco.services.UserService;
-import javax.validation.Valid;
-import javax.validation.Validator;
-
-import org.hibernate.validator.constraints.LuhnCheck;
+import jakarta.validation.Valid;
 import org.springframework.beans.BeanUtils;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.Date;
 import java.util.Map;
 import java.util.Optional;
 
@@ -42,13 +42,18 @@ public class UserController {
 
         String cardNumber = userService.generateCreditCard();
 
+        UserModel userModel = null;
 
-        UserModel userModel = new UserModel(userDTO.getName(), userDTO.getBornDate(), userDTO.getCpf(), cardNumber, userDTO.getPassword());
+        try{
+            userModel = new UserModel(cardNumber, userDTO.getName(), new SimpleDateFormat("dd/MM/yyyy").parse(userDTO.getBornDate()), userDTO.getCpf(), userDTO.getPassword());
+        }catch (ParseException e){
+            return ResponseEntity.status(HttpStatus.CONFLICT).body("Data incorreta.");
+        }
 
 
-        System.out.println(userModel.getCardNumber());
 
-        return ResponseEntity.status(HttpStatus.CREATED).body(userService.save(userModel));
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(userService.insert(userModel));
         
     }
 
@@ -97,7 +102,7 @@ public class UserController {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Usuário não encontrado");
 
         TransactionModel transactionModel1 = new TransactionModel(LocalDate.now(), transactionModel.getReceptor(), userModelOptionalOperator.get().getName(), transactionModel.getValue(), transactionModel.getType());
-        userModelOptionalOperator.get().addTransaction(transactionModel1);
+        userModelOptionalOperator.get().addTransactionModel(transactionModel1);
 
         return ResponseEntity.status(HttpStatus.OK).body(transactionService.save(transactionModel));
     }

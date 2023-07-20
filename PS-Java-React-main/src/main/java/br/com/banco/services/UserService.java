@@ -2,8 +2,9 @@ package br.com.banco.services;
 
 import br.com.banco.models.UserModel;
 import br.com.banco.repositories.UserRepository;
-import javax.transaction.Transactional;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import java.util.Optional;
 
 @Service
@@ -20,6 +21,10 @@ public class UserService {
 
     public Optional<UserModel> findByName(String name){
         return userRepository.findByName(name);
+    }
+
+    public UserModel insert(UserModel userModel){
+        return userRepository.insert(userModel);
     }
 
     public String generateCreditCard(){

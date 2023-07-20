@@ -1,11 +1,10 @@
 package br.com.banco.dtos;
 
 
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import org.hibernate.validator.constraints.br.CPF;
 
-import javax.validation.constraints.Min;
-import javax.validation.constraints.NotBlank;
-import javax.validation.constraints.Size;
 
 public class UserDTO {
     @NotBlank
