@@ -4,7 +4,6 @@ import br.com.banco.models.UserModel;
 import br.com.banco.repositories.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 import java.util.Optional;
 
 @Service
@@ -15,37 +14,29 @@ public class UserService {
         this.userRepository = userRepository;
     }
 
-    public boolean existsByCardNumber(String cardNumber){
-        return userRepository.existsByCardNumber(cardNumber);
-    }
-
-    public Optional<UserModel> findByName(String name){
-        return userRepository.findByName(name);
-    }
-
     public UserModel insert(UserModel userModel){
         return userRepository.insert(userModel);
     }
 
     public String generateCreditCard(){
-        String generatedCardNumber;
+        StringBuilder generatedCardNumber;
         do{
-            generatedCardNumber = "";
+            generatedCardNumber = new StringBuilder();
             for(int i = 0; i < 4; i++){
                 int n = (int) (Math.random()*10000);
 
-                generatedCardNumber += String.valueOf(n);
+                generatedCardNumber.append(n);
                 if(i != 3)
-                    generatedCardNumber += "-";
+                    generatedCardNumber.append("-");
             }
-        }while(!isCreditCardValid(generatedCardNumber));
+        }while(!isCreditCardValid(generatedCardNumber.toString()));
 
-        return generatedCardNumber;
+        return generatedCardNumber.toString();
     }
 
     private boolean isCreditCardValid(String cardNumber) {
         String cn = cardNumber.replace("-", "");
-        int a[] = {cardNumber.length()%2 == 0? 1 : 2};
+        int[] a = {cardNumber.length()%2 == 0? 1 : 2};
         return cn.chars().map(i -> i - '0').map(n -> n * (a[0] = a[0] == 1? 2 : 1)).map(n -> n > 9? n-9 : n).sum()%10 == 0;
     }
 
@@ -57,7 +48,7 @@ public class UserService {
         return userRepository.existsByName(username);
     }
 
-    public Optional<UserModel> findUserModelByCardNumberAndPassword(String cardNumber, String password){
+    public Optional<UserModel> findByCardNumberAndPassword(String cardNumber, String password){
         return userRepository.findByCardNumberAndPassword(cardNumber, password);
     }
 

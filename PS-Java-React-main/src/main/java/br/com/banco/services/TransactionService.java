@@ -5,6 +5,7 @@ import br.com.banco.repositories.TransactionRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
+import java.util.List;
 
 @Service
 public class TransactionService {
@@ -18,7 +19,19 @@ public class TransactionService {
         return repository.save(transactionModel);
     }
 
-    public TransactionModel TransactionDateGreaterThanAndTransactionDateLessThanAndReceptorContains(LocalDate from, LocalDate to, String receptor){
-        return repository.TransactionDateGreaterThanAndTransactionDateLessThanAndReceptorContains(from, to, receptor);
+    public List<TransactionModel> findByOperatorIdContainsOrReceptorIdContainsOrTransactionDateGreaterThanOrTransactionDateLessThan(
+            String operatorId,
+            String receptorId,
+            LocalDate from,
+            LocalDate to
+    ){
+
+        return repository.findByOperatorIdContainsOrReceptorIdContainsOrTransactionDateGreaterThanOrTransactionDateLessThan(
+                operatorId,
+                receptorId,
+                from,
+                to
+        );
     }
+
 }

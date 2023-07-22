@@ -1,5 +1,6 @@
 package br.com.banco.controllers;
 
+import br.com.banco.dtos.TransactionDTO;
 import br.com.banco.dtos.UserDTO;
 import br.com.banco.models.TransactionModel;
 import br.com.banco.models.UserModel;
@@ -10,18 +11,14 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.util.Date;
+import java.time.format.DateTimeParseException;
 import java.util.Map;
 import java.util.Optional;
 
 
 @RestController
-@CrossOrigin(origins = "*", maxAge = 3600)
+@CrossOrigin
 @RequestMapping("/user")
 public class UserController {
     private final TransactionService transactionService;
@@ -42,15 +39,13 @@ public class UserController {
 
         String cardNumber = userService.generateCreditCard();
 
-        UserModel userModel = null;
-
-        try{
-            userModel = new UserModel(cardNumber, userDTO.getName(), new SimpleDateFormat("dd/MM/yyyy").parse(userDTO.getBornDate()), userDTO.getCpf(), userDTO.getPassword());
-        }catch (ParseException e){
-            return ResponseEntity.status(HttpStatus.CONFLICT).body("Data incorreta.");
-        }
-
-
+        UserModel userModel = new UserModel(
+                cardNumber,
+                userDTO.getName(),
+                LocalDate.parse(userDTO.getBornDate()),
+                userDTO.getCpf(),
+                userDTO.getPassword()
+        );
 
 
         return ResponseEntity.status(HttpStatus.CREATED).body(userService.insert(userModel));
@@ -59,25 +54,29 @@ public class UserController {
 
     @GetMapping("/login{cardNumber}{password}")
     public ResponseEntity<Object> getUser(@RequestParam Map<String, String> params){
-        Optional<UserModel> userModelOptional = userService.findUserModelByCardNumberAndPassword(params.get("cardNumber"), params.get("password"));
-        System.out.println("card: "+params.get("cardNumber")+"\npassword: "+params.get("password"));
-        if(userModelOptional.isEmpty())
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Usuário não encontrado");
-        return ResponseEntity.status(HttpStatus.OK).body(userModelOptional.get());
+        Optional<UserModel> userModelOptional = userService.findByCardNumberAndPassword(params.get("cardNumber"), params.get("password"));
+
+        return userModelOptional.<ResponseEntity<Object>>map(userModel ->
+                ResponseEntity.status(HttpStatus.OK).body(userModel)).orElseGet(() ->
+                ResponseEntity.status(HttpStatus.NOT_FOUND).body("Usuário não encontrado"));
     }
 
     @DeleteMapping("/{cardNumber}")
     public ResponseEntity<Object> deleteUser(@PathVariable(value = "cardNumber")String cardNumber){
         Optional<UserModel> userModelOptional = userService.findByCardNumber(cardNumber);
+
         if(userModelOptional.isEmpty())
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Usuário não encontrado");
+
         userService.delete(userModelOptional.get());
+
         return ResponseEntity.status(HttpStatus.OK).body("Usuário deletado com sucesso");
     }
 
     @PutMapping("/{cardNumber}")
     public ResponseEntity<Object> updateUser(@PathVariable(value = "cardNumber")String cardNumber, @RequestBody @Valid UserDTO userDTO){
         Optional<UserModel> userModelOptional = userService.findByCardNumber(cardNumber);
+
         if(userModelOptional.isEmpty())
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Usuário não encontrado");
 
@@ -88,34 +87,61 @@ public class UserController {
         userModel.setBalance(userModelOptional.get().getBalance());
         userModel.setCpf(userModelOptional.get().getCpf());
         userModel.setBornDate(userModelOptional.get().getBornDate());
-        userModel.setTransactionModel(userModelOptional.get().getTransactionModel());
 
         return ResponseEntity.status(HttpStatus.OK).body(userService.save(userModel));
     }
 
-    @PostMapping("/transfer{cardNumber}")
-    public ResponseEntity<Object> transfer(@PathVariable(value = "cardNumber") String cardNumber, @RequestBody TransactionModel transactionModel){
-        System.out.println("Entrou");
-        Optional<UserModel> userModelOptionalOperator = userService.findByCardNumber(cardNumber);
-        System.out.println("Is empty"+userModelOptionalOperator.isEmpty());
-        if(userModelOptionalOperator.isEmpty())
+    @PutMapping("/transfer")
+    public ResponseEntity<Object> transfer(@RequestBody TransactionDTO transactionDto){
+        Optional<UserModel> userModelOptionalOperator = userService.findByCardNumber(transactionDto.getOperator());
+        Optional<UserModel> userModelOptionalReceptor = userService.findByCardNumber(transactionDto.getReceptor());
+
+        if(userModelOptionalOperator.isEmpty() || userModelOptionalReceptor.isEmpty())
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Usuário não encontrado");
 
-        TransactionModel transactionModel1 = new TransactionModel(LocalDate.now(), transactionModel.getReceptor(), userModelOptionalOperator.get().getName(), transactionModel.getValue(), transactionModel.getType());
-        userModelOptionalOperator.get().addTransactionModel(transactionModel1);
+
+        TransactionModel transactionModel = new TransactionModel(
+                LocalDate.now(),
+                userModelOptionalReceptor.get(),
+                userModelOptionalOperator.get(),
+                transactionDto.getValue(),
+                transactionDto.getType()
+        );
 
         return ResponseEntity.status(HttpStatus.OK).body(transactionService.save(transactionModel));
     }
 
-    @GetMapping("/transactions{from}{to}{receptor}")
-    public ResponseEntity<Object> getTransactions(@RequestParam Map<String, String> filter, @RequestBody UserModel userModel){
-        Optional<UserModel> userModelOptional = userService.findByCardNumber(userModel.getCardNumber());
-        if(userModelOptional.isEmpty())
+    @GetMapping("/transactions{from}{to}{receptor}{operator}")
+    public ResponseEntity<Object> getTransactions(@RequestParam Map<String, String> params){
+        Optional<UserModel> userModelOptionalOperator = userService.findByCardNumber(params.get("operator"));
+        Optional<UserModel> userModelOptionalReceptor = userService.findByCardNumber(params.get("receptor"));
+
+        if(userModelOptionalReceptor.isEmpty()){
+            userModelOptionalReceptor = Optional.empty();
+        }
+
+        if(userModelOptionalOperator.isEmpty()){
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Usuário não encontrado");
+        }
+
+        LocalDate from = LocalDate.EPOCH;
+        LocalDate to = LocalDate.now();
+        try{
+            from = LocalDate.parse(params.get("from"));
+            to = LocalDate.parse(params.get("to"));
+        }catch (DateTimeParseException ignored){}
 
 
-
-        return ResponseEntity.status(HttpStatus.CREATED).body(transactionService.TransactionDateGreaterThanAndTransactionDateLessThanAndReceptorContains(LocalDate.parse(filter.get("from")), LocalDate.parse(filter.get("to")), filter.get("receptor")));
+        return ResponseEntity
+                .status(HttpStatus.OK)
+                .body(transactionService
+                        .findByOperatorIdContainsOrReceptorIdContainsOrTransactionDateGreaterThanOrTransactionDateLessThan(
+                                userModelOptionalOperator.get().getId(),
+                                userModelOptionalReceptor.map(UserModel::getId).orElse("null"),
+                                from,
+                                to
+                        )
+                );
     }
 
 }
